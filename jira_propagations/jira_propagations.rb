@@ -4,7 +4,7 @@ require 'pp'
 require 'pry'
 
 class JiraPropagation
-
+  attr_reader :username, :password
   def initialize username, password
     @username = username
     @password = password
