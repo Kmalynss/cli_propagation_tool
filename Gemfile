@@ -7,3 +7,5 @@ gem 'pry-doc'
 gem 'jira-ruby', '0.1.17'
 gem 'highline'
 gem 'octokit'
+
+gem 'rspec', '~> 3.4.0'

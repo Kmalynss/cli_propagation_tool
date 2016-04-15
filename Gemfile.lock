@@ -9,6 +9,7 @@ GEM
       tzinfo (~> 1.1)
     addressable (2.4.0)
     coderay (1.1.1)
+    diff-lcs (1.2.5)
     faraday (0.9.0)
       multipart-post (>= 1.2, < 3)
     highline (1.7.8)
@@ -32,6 +33,19 @@ GEM
       yard (~> 0.8)
     pry-rails (0.3.4)
       pry (>= 0.9.10)
+    rspec (3.4.0)
+      rspec-core (~> 3.4.0)
+      rspec-expectations (~> 3.4.0)
+      rspec-mocks (~> 3.4.0)
+    rspec-core (3.4.4)
+      rspec-support (~> 3.4.0)
+    rspec-expectations (3.4.0)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.4.0)
+    rspec-mocks (3.4.1)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.4.0)
+    rspec-support (3.4.1)
     sawyer (0.7.0)
       addressable (>= 2.3.5, < 2.5)
       faraday (~> 0.8, < 0.10)
@@ -50,6 +64,7 @@ DEPENDENCIES
   octokit
   pry-doc
   pry-rails
+  rspec (~> 3.4.0)
 
 BUNDLED WITH
-   1.10.0
+   1.10.6

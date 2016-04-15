@@ -1,8 +1,8 @@
 require 'highline'
+require 'yaml'
 
 require_relative 'jira_propagations'
-require_relative '../git_propagations'
-require 'yaml'
+require_relative 'git_propagations'
 
 module Propagator
   class CLI
