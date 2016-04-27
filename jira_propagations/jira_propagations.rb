@@ -25,45 +25,101 @@ class JiraPropagation
     @client ||= JIRA::Client.new(client_options)
   end
 
+  def issue
+    jira_ticket = client.Issue.find("#{jira_key}")
+  end
+
   def update_sub_tasks(sub_ticket_options)
-    parent_jira_sub_ticket_id = ''
     sub_ticket_options.each do |option|
-      jira_sub_ticket = client.Issue.find("#{option[:key]}")
-      comment = jira_sub_ticket.comments.build
-      comment.save!(:body => "PR #{option[:url]}")
-      transition = jira_sub_ticket.transitions.build
-      transition.save!("transition" => {"id" => 381})
-      parent_jira_sub_ticket_id = jira_sub_ticket.parent['id']
+      propagation = @propagations.find {|propagation| propagation.issue_key == option[:key]}
+      propagation.update_with_pr option[:url]
+      propagation.move_to_code_review
     end
-    parent_jira_sub_ticket = client.Issue.find("#{parent_jira_sub_ticket_id}")
-    if parent_jira_sub_ticket.status.name != "Code Propagation"
-      transition = parent_jira_sub_ticket.transitions.build
+    parent_issue = @propagations.first.pateny_issue
+    if parent_issue.status.name != "Code Propagation"
+      transition = parent_issue.transitions.build
       transition.save!("transition" => {"id" => 521})
     end
     p "Jira sub tickets were successfully updated"
   end
 
   def create_jira_sub_task jira_key, target_branches
-    jira_ticket = client.Issue.find("#{jira_key}")
-    jira_project = client.Project.find("#{jira_key[/\A\w+/]}")
-
-    @new_sub_tickets = target_branches.map do |target_branch|
-      sub_ticket = client.Issue.build
-      sub_ticket.save({fields: {parent: {id: "#{jira_ticket.id}"}, project: {id: "#{jira_project.id}"}, summary: "Propagate #{jira_key} in #{target_branch}", issuetype: {id: "10600"}, description: "", customfield_12905: {'name' => "#{target_branch}"}}})
-      sub_ticket.fetch
-
-      transition = sub_ticket.transitions.build
-      transition.save!("transition" => {"id" => 4})
-      {sub_ticket_key: sub_ticket.key, target_branch: target_branch}
-    end
-
+    @propagations = Propagation.create client: client, issue_key: jira_key, branches: target_branches
+    
     if jira_ticket.status.name != "In Progress" && jira_ticket.status.name != "Code Propagation"
       transition = jira_ticket.transitions.build
       transition.save!("transition" => {"id" => 4})
     end
 
-    @new_sub_tickets
+    @propagations.map do |propagation|
+      { sub_ticket_key: propagation.issue_key, target_branch: propagation.branch }
+    end
   end
+
+  class Propagation
+    def self.create client:, issue_key:, branches:
+      branches.map do |branch|
+        propagation =  self.new(client, issue_key, branch).create
+        propagation.move_to_in_progress
+        propagation
+      end
+    end
+    
+    attr_reader :client, :parent_issue_key, :branch
+
+    def initialize client:, parent_issue_key:, branch:
+      @client = client
+      @parent_issue_key = parent_issue_key
+      @branch = branch
+    end
+
+    def parent_issue issue_key
+      client.Issue.find("#{parent_issue_key}")
+    end
+
+    def project issue_key
+      client.Project.find("#{parent_issue_key[/\A\w+/]}")
+    end
+
+    def issue
+      @issue ||= client.Issue.build
+    end
+
+    def issue_key
+      issue.key
+    end
+
+    def create
+      issue.save(params_to_create)
+      issue.fetch
+      self
+    end
+
+    def move_to_in_progress
+      issue.transitions.build.save!("transition" => {"id" => 4})
+    end
+
+    def params_to_create
+      {fields: {
+        parent: {id: "#{parent_issue.id}"},
+        project: {id: "#{project.id}"},
+        summary: "Propagate #{parent_issue_key} in #{branch}",
+        issuetype: {id: "10600"},
+        description: "",
+        customfield_12905: {'name' => "#{branch}"}
+      }}
+    end
+
+    def update_with_pr pr_url
+      issue.comments.build.save!(:body => "PR: #{pr_url}")
+    end
+
+    def move_to_code_review
+      issue.transitions.build.save!("transition" => {"id" => 381})
+    end
+
+  end
+
 end
 
 #jira = JiraPropagation.new("CD-52443", ["014_6_release", "014_7_release"])
