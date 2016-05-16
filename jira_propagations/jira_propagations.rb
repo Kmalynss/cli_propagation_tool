@@ -5,6 +5,8 @@ require 'pry'
 
 class JiraPropagation
 
+  attr_reader :task
+
   def initialize username, password
     @username = username
     @password = password
@@ -25,44 +27,63 @@ class JiraPropagation
     @client ||= JIRA::Client.new(client_options)
   end
 
-  def issue
-    jira_ticket = client.Issue.find("#{jira_key}")
-  end
-
-  def update_sub_tasks(sub_ticket_options)
-    sub_ticket_options.each do |option|
-      propagation = @propagations.find {|propagation| propagation.issue_key == option[:key]}
-      propagation.update_with_pr option[:url]
-      propagation.move_to_code_review
-    end
-    parent_issue = @propagations.first.pateny_issue
-    if parent_issue.status.name != "Code Propagation"
-      transition = parent_issue.transitions.build
-      transition.save!("transition" => {"id" => 521})
-    end
-    p "Jira sub tickets were successfully updated"
-  end
-
   def create_jira_sub_task jira_key, target_branches
-    @propagations = Propagation.create client: client, issue_key: jira_key, branches: target_branches
-    
-    if jira_ticket.status.name != "In Progress" && jira_ticket.status.name != "Code Propagation"
-      transition = jira_ticket.transitions.build
-      transition.save!("transition" => {"id" => 4})
-    end
-
-    @propagations.map do |propagation|
+    self.task = Task.new client, jira_key
+    task.create_propagations target_branches
+    task.move_to_in_progress
+    task.propagations.map do |propagation|
       { sub_ticket_key: propagation.issue_key, target_branch: propagation.branch }
     end
   end
 
-  class Propagation
-    def self.create client:, issue_key:, branches:
-      branches.map do |branch|
-        propagation =  self.new(client, issue_key, branch).create
-        propagation.move_to_in_progress
-        propagation
+  def update_sub_tasks(sub_ticket_options)
+    sub_ticket_options.each do |option|
+      propagation = task.propagations.find {|propagation| propagation.issue_key == option[:key]}
+      propagation.update_with_pr option[:url]
+      propagation.move_to_code_review
+    end
+    task.move_to_code_propagation
+  end
+
+
+  class Task
+    attr_reader :client, :issue_key, :propagations
+    def initialize client, issue_key
+      @client = client
+      @issue_key = issue_key
+    end
+
+    def issue
+      @issue ||= client.Issue.find(issue_key)
+    end
+
+    def create_propagations branches
+      @propagations = branches.map do |branch|
+        Propagation.create client: client, issue_key: issue_key, branch: branch
+      end 
+    end
+
+    def move_to_in_progress
+      if issue.status.name != "In Progress" && issue.status.name != "Code Propagation"
+        transition = issue.transitions.build
+        transition.save!("transition" => {"id" => 4})
       end
+    end
+
+    def move_to_code_propagation
+      if issue.status.name != "Code Propagation"
+        transition = issue.transitions.build
+        transition.save!("transition" => {"id" => 521})
+      end
+      p "Jira sub tickets were successfully updated"
+    end
+  end
+
+  class Propagation
+    def self.create client:, issue_key:, branch:
+      propagation =  self.new(client, issue_key, branch).create
+      propagation.move_to_in_progress
+      propagation
     end
     
     attr_reader :client, :parent_issue_key, :branch
