@@ -25,12 +25,12 @@ module Propagator
 
     def reviewer_lvl_1
       puts 'Choose 1st level reviewer:'
-      cli.choose(reviewers.first)
+      cli.choose(*reviewers.first)
     end
 
     def reviewer_lvl_2
       puts 'Choose 2nd level reviewer:'
-      cli.choose(reviewers.second)
+      cli.choose(*reviewers.second)
     end
 
     def risk_level
@@ -52,14 +52,14 @@ module Propagator
 
     def poll_user
       OpenStruct.new({
-        :jira_ticket_key => jira_ticket_key,
-        :target_branch_names => target_branch_names,
-        :reviewer_lvl_1 => reviewer_lvl_1,
-        :reviewer_lvl_2 => reviewer_lvl_2,
-        :risk_level => risk_level,
-        :summary_of_issue => summary_of_issue,
-        :summary_of_change => summary_of_change,
-        :testing_approach => testing_approach
+        :jira_ticket_key => 'CD-52443',#jira_ticket_key,
+        :target_branch_names => ['master'],#target_branch_names,
+        :reviewer_lvl_1 => 1,#reviewer_lvl_1,
+        :reviewer_lvl_2 => 1,#reviewer_lvl_2,
+        :risk_level => 1,#risk_level,
+        :summary_of_issue => 'a',#summary_of_issue,
+        :summary_of_change => 'b',#summary_of_change,
+        :testing_approach => 'c',#testing_approach
       })
     end
   end
@@ -91,13 +91,8 @@ module Propagator
       result[:testing_approach] = user_data.testing_approach
       result[:reviewers] = [user_data.reviewer_lvl_1, user_data.reviewer_lvl_2]
       result[:risk_level] = user_data.risk_level
-      result[:description_template] = pr_description_template
       result
 
-    end
-
-    def pr_description_template
-      File.open('pr_description.md.erb') {|f| f.read }
     end
 
     def params_to_populate_prs_to_subtasks tasks_to_pr_ids
@@ -120,7 +115,7 @@ module Propagator
       jira_propagation_result = jira_client.create_jira_sub_task *params_to_create_propagations(user_data)
 
       p  params_to_create_prs(user_data, jira_propagation_result)
-      propagation_tasks_to_pr_ids = github_client.create_pr params_to_create_prs(user_data, jira_propagation_result)
+      propagation_tasks_to_pr_ids = github_client.create_prs params_to_create_prs(user_data, jira_propagation_result)
   
       p params_to_update_prs(jira_propagation_result, propagation_tasks_to_pr_ids)
       jira_client.update_sub_tasks params_to_update_prs(jira_propagation_result, propagation_tasks_to_pr_ids)
@@ -133,7 +128,12 @@ reviewers = OpenStruct.new config['reviewers']
 jira = OpenStruct.new config['jira']
 git = OpenStruct.new config['git']
 
-Propagator.propagate Propagator::CLI.new(reviewers).poll_user, GitPropagation.new(git.token), JiraPropagation.new(jira.username, jira.password)
+
+Propagator.propagate(
+  Propagator::CLI.new(reviewers).poll_user,
+  GitPropagation.new(git.token),
+  JiraPropagation.new(jira.username, jira.password)
+)
 
 
 

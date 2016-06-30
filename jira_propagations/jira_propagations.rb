@@ -5,7 +5,8 @@ require 'pry'
 
 class JiraPropagation
 
-  attr_reader :task
+  attr_reader :username, :password
+  attr_accessor :task
 
   def initialize username, password
     @username = username
@@ -81,7 +82,7 @@ class JiraPropagation
 
   class Propagation
     def self.create client:, issue_key:, branch:
-      propagation =  self.new(client, issue_key, branch).create
+      propagation =  self.new(client: client, parent_issue_key: issue_key, branch: branch).create
       propagation.move_to_in_progress
       propagation
     end
@@ -94,11 +95,11 @@ class JiraPropagation
       @branch = branch
     end
 
-    def parent_issue issue_key
+    def parent_issue
       client.Issue.find("#{parent_issue_key}")
     end
 
-    def project issue_key
+    def project
       client.Project.find("#{parent_issue_key[/\A\w+/]}")
     end
 
